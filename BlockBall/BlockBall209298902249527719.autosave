@@ -1,0 +1,396 @@
+//Variable des class-----------------------------------------------------------------------
+Player p1;    //Barre en bas
+Ball b1;      //Ball du jeux
+Level lv1;    //A venir*********
+
+
+//Variables globale jeux----------------------
+int currentTime;
+int previousTime;
+int deltaTime;
+float movingSpeed = 1;     //Vitesse de la barre en bas
+float ballspeed = 1;       //Vitesse de la balle
+int maxLives = 3;          //Nb balle maximale en debut partie
+int gameLive;              //Nb de balle restante en cours de partie
+int currentLvl = 0;        //Lvl en cours     A venir********   
+int Width = 1200;
+int Height = 720;
+ArrayList<Background> bgLayers; 
+
+
+//Variables du menu---------------------------
+int score=0;
+
+enum State {menuStart, menuSetting, inGameOn, inGameOff, endGame, gameOver};
+State gameState = State.menuStart;                      //Setter etat du jeu a menu en partant
+boolean btn_enter = false;
+boolean btn_left = false;
+boolean btn_right = false;
+boolean btn_s = false;
+boolean btn_e= false;
+boolean btn_space = false;
+
+
+//section level
+Block[] blocks = new Block[300];
+  
+int cols;
+int rows;
+int numBlocks;
+
+  int aliveBlocks = 0;
+  int deadBlocks = 0;
+  int counter = 0;
+//************
+
+void settings() {
+  //fullScreen(P2D);
+  size(Width, Height, P2D);
+}
+
+//SETUP-----------------------------------------------------------------------------------
+void setup() {
+  currentTime = millis();
+  previousTime = currentTime;
+  
+  //Creation des objets
+  p1 = new Player();
+  b1 = new Ball();
+  
+  
+  //Initialisation jeu
+  gameLive = maxLives;
+  loadBackgroundLayers();
+  
+  
+  //Section level
+  cols = (int) width / 60;
+  rows = 8;
+  numBlocks = rows * cols;   
+
+  int index=0;
+  for (int i=0; i<cols; i++) 
+  {
+    for (int j=0; j<rows; j++) 
+    {
+       blocks[index] = new Block(i * 60, j * 40);
+
+      if (blocks[index].alive > 0) 
+      {
+         aliveBlocks++;
+      } 
+      else 
+      {
+        deadBlocks++;
+      }      
+      index++;
+    }
+  }
+  //****************
+  
+}
+
+
+//BOUCLE DE JEU---------------------------------------------------------------------------
+void draw() {
+  currentTime = millis();
+  deltaTime = currentTime - previousTime;
+  previousTime = currentTime;
+  
+  switch (gameState)
+  {
+    //(OK)  Menu de depart
+    case menuStart :   
+        background(100, 100, 0);
+        textSize(int(50));
+        text("BlockBall Game", 500 , 100); 
+        text("Press ENTER to start", 50, 300);
+        text("Press s to option menu", 50, height-50);
+        textSize(30);
+        text("Press SPACE to launch the ball", 50, 460);
+        text("Press RIGHT to move right", 50, 500);
+        text("Press LEFT to move left", 50, 540);
+        
+        //lv1 = new Level();
+        
+        //Gestion des controles
+        b1.setBallDrop(false);
+        if (btn_enter) {
+          gameState = State.inGameOff;
+          btn_enter = false;
+        }
+        else if (btn_s) {
+          gameState = State.menuSetting;
+          btn_s = false;
+        }
+       
+        break;
+        
+     //=================================================
+     
+     //(OK) Menu setting  ***************A venir*******************
+     case menuSetting :            
+        background(100, 100, 0);
+        textSize(int(50));
+        text("Setting", 500 , 100); 
+        
+        
+        textSize(30);
+        text("Press e to exit and return to menu", 50, 460);
+        if (btn_e) {
+          gameState = State.menuStart;
+          btn_e = false;
+        }
+
+        break;
+        
+     //=================================================
+     
+     //(OK) Partie commencer avec ball en jeux
+     case inGameOn :     
+        //background(0);
+        for (Background bg : bgLayers) {
+          bg.display();
+        }  
+        
+        showGameStat();
+        p1.show();
+        b1.show();
+        b1.update();
+        
+        
+        
+        //Eventuellement remplacer par un level
+        for (int i = 0; i < numBlocks; i++)   
+          blocks[i].show();
+        
+        //Regarder les collision
+        b1.padCollision(p1);
+        for (int i=0; i<numBlocks; i++) b1.blockCollision(blocks[i]);
+        
+        //Si la ball a tombe
+        if (b1.getBallDrop()) gameState = State.inGameOff;
+        
+        
+        checkWinGame();
+        break;
+      
+     //=================================================
+     
+     //(OK)  Partie commencer mais ball pas en jeux
+     case inGameOff :     
+        //background(0);
+        for (Background bg : bgLayers) {
+          bg.display();
+        }  
+        
+        showGameStat();
+        for (int i = 0; i < numBlocks; i++)   
+          blocks[i].show();
+        p1.show();
+        p1.resetPos();
+        b1.show();
+        b1.update();
+        b1.resetPos();
+        loseBallText(); 
+        
+        //Si on arrive en cet etat par la perte balle
+        if (b1.getBallDrop()) {
+          b1.setBallDrop(false);
+          
+          if (gameLive <= 0) gameState = State.gameOver; 
+          else gameLive --;
+         }
+       
+         //Si presse Space pour relancer balle
+         if (btn_space) {
+           btn_space = false;
+           b1.setBallDrop(false);
+           b1.setSpeed(0,5);
+           gameState = State.inGameOn;
+         }
+         
+        break;
+      
+      //=================================================  
+      
+      //(OK)  Menu de la partie terminer en perdant
+      case gameOver :       //Si la partie est terminer
+        background(0, 100, 100);
+        textSize(int(50));
+        text("BlockBall Game", 500 , 100); 
+        text("Game Over", 50, 300);
+        textSize(30);
+        text("Press Enter to return to main menu", 50, 460);
+          
+        //Si presse ENTER pour revenir menu depart
+        if (btn_enter) {
+          btn_enter = false;
+          gameState = State.menuStart;
+          resetGame();
+        }
+            
+        break;
+      
+      //=================================================  
+       
+      //(OK)  Menu de la partie terminer en gagnant
+      case endGame :          
+        background(100, 100, 100);
+        
+        //Si presse ENTER pour revenir menu depart
+        if (btn_enter) {
+          btn_enter = false;
+          gameState = State.menuStart;
+          resetGame();
+        }
+       
+        break;
+      
+      //=================================================    
+        
+      default :
+        break;
+  }
+  
+  
+  update(deltaTime);
+}
+ 
+ 
+ 
+//Methode control---------------------------------------------------------------------------
+void keyReleased() {
+   if (keyCode == ENTER) btn_enter = true;
+   if (key == 's') btn_s = true;
+   if (key == 'e') btn_e = true;
+   if ((key == ' ') && (gameState == State.inGameOff) ) btn_space = true;
+   
+}
+
+void mouseMoved(){
+  if (gameState == State.inGameOn)
+    p1.moving(mouseX);
+  
+  float w = width/2;
+  
+   
+  if (mouseX < w)
+  {
+    bgLayers.get(2).velocity.x = (w - mouseX) / 10;
+    bgLayers.get(3).velocity.x = (w - mouseX) / 20;
+  }
+  else if (mouseX > w)
+  {
+    bgLayers.get(2).velocity.x = ((w - mouseX) / 10)*-1;
+    bgLayers.get(3).velocity.x = ((w - mouseX) / 20)*-1;
+  }
+  
+}
+
+void keyPressed() {
+  //if ((keyCode == LEFT) && (gameState == State.inGameOn) ) btn_left = true;
+  //if ((keyCode == RIGHT) && (gameState == State.inGameOn) ) btn_right = true;
+}
+
+
+//Methode AFFICHAGE-------------------------------------------------------------------------
+
+//Affichage dans le jeux principale (nb ball, scrore)
+void showGameStat() {
+  fill(255);
+  textSize(15);
+  text("Live : ", 10, height-5);
+  text( gameLive, 70, height-5);
+  //text("SCORE:", width-120, height-15);
+  //text( score, width-50, height-15);
+  
+}
+
+
+//Affichage quand perd une balle et de presser ENTRER to start ball
+void loseBallText() {
+  textSize(30);
+  //text(" life -1 ", width/2-137, height - 100);
+  text(" Hit SPACE to launch new ball ", width/2-137, height - 150);
+}
+
+
+//Affichage quand la partie est gagner
+void winGame() {
+  noStroke();
+  fill(120, 120, 0);
+  rect(0, 0, width, height);
+  fill(255);
+  textSize(43);
+  text("Press SPACEBAR to start again", 147, 450);
+  textSize(30);
+  text("You win", width/2-75, height/2);
+}
+
+
+//METHODE UTILITAIRES--------------------------------------------------------------------------
+//Regarde si il reste des blocks vivants
+void checkWinGame() {
+  if (aliveBlocks == 0) {
+   //A faire **************
+  }
+}
+
+
+//Sert a remettre game a valeur de depart
+void resetGame() {
+  gameLive = maxLives;
+  //currentLvl = 0;      *******A Venir********************
+  resetBlocks();
+  counter = 0;
+}
+
+
+//Sert a reseter la game de block    ************TEMPORAIRE va changer avec level*********************
+void resetBlocks() {
+  aliveBlocks = 0;
+  for (int index = 0; index < numBlocks; index++) {
+
+    blocks[index].alive= -1 + (int)random(2) * 2;
+    if (blocks[index].alive > 0) {
+      aliveBlocks++;
+    }
+  }
+}
+
+
+
+
+//METHODES PARALLAX-----------------------------------------------------------------------------
+private void loadBackgroundLayers() {
+  bgLayers = new ArrayList<Background>();
+  bgLayers.add( new Background("forest4.png"));
+  bgLayers.add( new Background("forest3.png"));
+  bgLayers.add( new Background("forest2.png"));
+  bgLayers.add( new Background("forest1.png"));
+ 
+  float speedIncrement = 0.25;
+  float currentSpeed = 1;
+  
+  
+  for (int i = 0; i < bgLayers.size(); i++) {
+    Background current = bgLayers.get(i);
+    
+    if (i > 1) {      
+      current.isParallax = true;
+      current.velocity.x = currentSpeed;
+      currentSpeed += speedIncrement;
+    } 
+    
+    current.scale = 0.5;
+  }
+}
+
+
+void update(int delta) {
+ 
+  for (Background bg : bgLayers) {
+    bg.update(delta);
+  }
+}
